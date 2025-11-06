@@ -1,58 +1,38 @@
-name: CI/CD Pipeline - Medplus App
+name: Deploy to ECR
 
 on:
   push:
-    branches: [ main ]
+    branches:
+      - main
 
 jobs:
-  build_and_deploy:
+  build-and-push:
     runs-on: ubuntu-latest
 
     steps:
-    - name: Checkout Code
+    - name: Checkout code
       uses: actions/checkout@v3
 
-    - name: Configure AWS Credentials
+    - name: Configure AWS credentials
       uses: aws-actions/configure-aws-credentials@v2
       with:
         aws-access-key-id: ${{ secrets.AWS_ACCESS_KEY_ID }}
         aws-secret-access-key: ${{ secrets.AWS_SECRET_ACCESS_KEY }}
-        aws-region: ${{ secrets.AWS_REGION }}
+        aws-region: us-east-1
 
-    - name: Log in to Amazon ECR
+    - name: Login to Amazon ECR
       id: login-ecr
-      uses: aws-actions/amazon-ecr-login@v2
+      uses: aws-actions/amazon-ecr-login@v1
 
-    - name: Build, Tag, and Push Docker Image
+    - name: Build, tag, and push image to Amazon ECR
+      env:
+        ECR_REGISTRY: 290549574640.dkr.ecr.us-east-1.amazonaws.com
+        ECR_REPOSITORY: mediplus
+        IMAGE_TAG: ${{ github.sha }}
       run: |
-        IMAGE_URI=${{ secrets.REGISTRY_NAME }}/medplux:$GITHUB_RUN_NUMBER
-        docker build -t $IMAGE_URI .
-        docker push $IMAGE_URI
-
-
-  update-k8s-yaml:
-    runs-on: ubuntu-latest
-    needs: build_and_deploy
-
-    steps: 
-    - name: clone-k8s-yaml repo
-      env: 
-        GIT_USERNAME: ${{ secrets.GIT_USERNAME }}
-        GIT_PASSWORD: ${{ secrets.GIT_PASSWORD }}
-      run: |
-        git clone https://${GIT_USERNAME}:${GIT_PASSWORD}@github.com/digitalwitchdemo/kubernetes-manifest.git
-        cd kubernetes-manifest/medplux-yaml
-        cat deployment.yaml
-
-        sed -i "s+696035274327.dkr.ecr.us-east-1.amazonaws.com/medplux:.*+696035274327.dkr.ecr.us-east-1.amazonaws.com/medplux:$GITHUB_RUN_NUMBER+g" deployment.yaml
-        cat deployment.yaml
-        git config user.email support@digitalwitchng.online
-        git config user.name ${GIT_USERNAME}
-        git add .
-        git commit -m "Updated the k8s.yaml with new image tag"
-        git push https://${GIT_USERNAME}:${GIT_PASSWORD}@github.com/digitalwitchdemo/kubernetes-manifest.git HEAD:main
-        
-      
-    
-      
-     
+        # Build a docker container and
+        # push it to ECR so that it can
+        # be deployed to ECS.
+        docker build -t $ECR_REGISTRY/$ECR_REPOSITORY:$IMAGE_TAG .
+        docker push $ECR_REGISTRY/$ECR_REPOSITORY:$IMAGE_TAG
+        echo "::set-output name=image::$ECR_REGISTRY/$ECR_REPOSITORY:$IMAGE_TAG"
