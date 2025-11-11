@@ -8,7 +8,7 @@ pipeline {
 
     environment {
         SONAR_URL = "http://13.222.28.200:9000"
-        DOCKER_IMAGE = "rohit5299/ultimate-cicd"
+        DOCKER_IMAGE = "godwinchinedu/mediplus-app"
     }
 
     stages {
